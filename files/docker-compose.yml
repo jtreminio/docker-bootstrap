@@ -1,0 +1,45 @@
+version: '3.2'
+
+networks:
+  webgateway:
+    driver: bridge
+
+services:
+  proxy:
+    container_name: traefik_proxy
+    image: traefik
+    command: >-
+      --docker --logLevel=INFO \
+      --acme \
+      --acme.acmelogging \
+      --acme.dnschallenge=false \
+      --acme.entrypoint="https" \
+      --acme.httpchallenge \
+      --acme.httpChallenge.entryPoint="http" \
+      --acme.onhostrule=true \
+      --acme.storage="/root/acme.json" \
+      --acme.email="${LE_EMAIL}" \
+      --entrypoints="Name:http Address::80 Redirect.EntryPoint:https" \
+      --entrypoints="Name:https Address::443 TLS" \
+      --defaultentrypoints="http,https"
+    labels:
+      - traefik.enable=false
+    networks:
+      - webgateway
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /dev/null:/traefik.toml
+      - /root/acme.json:/root/acme.json
+
+  watchtower:
+    container_name: watchtower
+    image: v2tec/watchtower
+    labels:
+      - traefik.enable=false
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock

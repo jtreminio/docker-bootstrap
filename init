@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -e
+set -o pipefail
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+CMD=${@:-ansible-playbook-wrapper}
+
+source "${DIR}/.env"
+
+SERVER_IP=${SERVER_IP:-}
+SSH_USER=${SSH_USER}
+SSH_PRIVATE_KEY=${SSH_PRIVATE_KEY}
+LE_EMAIL=${LE_EMAIL}
+
+if [[ -z "${SERVER_IP}" ]]; then
+    printf "You must create a .env file and define "
+    printf "SERVER_IP\n"
+
+    exit 1
+fi
+
+docker container run -it --rm \
+    -e INVENTORY=/etc/ansible/hosts.yml \
+    -e PLAYBOOK=/etc/ansible/playbook.yml \
+    -e ANSIBLE_HOST_KEY_CHECKING=false \
+    -e SERVER_IP=${SERVER_IP} \
+    -e SSH_USER=${SSH_USER} \
+    -e LE_EMAIL=${LE_EMAIL} \
+    -v ${PWD}:/etc/ansible \
+    -v ${SSH_PRIVATE_KEY}:/root/.ssh/id_rsa \
+    williamyeh/ansible:ubuntu16.04-onbuild bash -c "${CMD}"

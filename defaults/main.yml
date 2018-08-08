@@ -1,0 +1,6 @@
+add_firewall_rules: true
+
+ufw_allow_ports:
+  - 22
+  - 80
+  - 443

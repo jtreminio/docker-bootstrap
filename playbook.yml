@@ -1,0 +1,72 @@
+---
+
+- hosts: all
+
+  vars_files:
+    - defaults/main.yml
+    - vars.yml
+
+  tasks:
+    - name: Check if Docker installed
+      stat:
+        path: /usr/bin/docker
+      register: docker
+
+    - block:
+      - name: Add docker repo requirements
+        package:
+          name: "{{ item }}"
+          state: present
+        with_items:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+
+      - name: Install Docker
+        script: files/get-docker.sh
+
+      when: docker.stat.exists != true
+
+    - name: Install Docker Compose
+      get_url:
+        url: https://github.com/docker/compose/releases/download/1.22.0/docker-compose-Linux-x86_64
+        dest: /usr/local/bin/docker-compose
+        mode: "+x"
+
+    - block:
+      - name: Configure firewall
+        ufw:
+          rule: allow
+          port: "{{ item }}"
+        with_items: "{{ ufw_allow_ports }}"
+
+      - name: Enable firewall
+        ufw:
+          state: enabled
+
+      when: add_firewall_rules
+
+    - name: Copy docker-compose
+      copy:
+        src: files/docker-compose.yml
+        dest: /opt/
+
+    - name: Ensure Let's Encrypt datafile exists
+      file:
+        path: /root/acme.json
+        owner: root
+        group: root
+        mode: 0600
+        state: touch
+      changed_when: false
+
+    - name: Install Traefik and Watchtower
+      command: docker-compose up -d
+      args:
+        chdir: /opt/
+      environment:
+        COMPOSE_PROJECT_NAME: traefik
+        LE_EMAIL: "{{ lookup('env', 'LE_EMAIL') }}"
+      register: dc_changed
+      changed_when: "'up-to-date' not in dc_changed.stderr"
